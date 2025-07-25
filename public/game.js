@@ -49,6 +49,13 @@ class ClaireGame {
         this.teleportParticles = [];
         this.returnParticles = [];
         
+        // Admin system
+        this.adminMode = false;
+        this.adminSequence = [];
+        this.adminTarget = ['a', 'b', 'c'];
+        this.pPressed = false; // For admin power-up
+        this.ePressed = false; // For admin teleport
+        
         // Mobile controls
         this.isMobile = this.detectMobile();
         this.joystickData = { x: 0, y: 0, active: false };
@@ -68,11 +75,25 @@ class ClaireGame {
         this.jumpCount = 0;
         this.maxJumps = 2;
         
+        // Admin properties
+        this.godMode = false;
+        this.infiniteLives = false;
+        this.speedMultiplier = 1.0;
+        this.jumpMultiplier = 1.0;
+        this.deathCount = 0;
+        this.physicsEnabled = true;
+        this.gamePaused = false;
+        this.particlesEnabled = true;
+        this.rainbowTrail = false;
+        this.discoLights = false;
+        this.superSpeed = false;
+        this.pathTracking = false;
+        this.timeScale = 1.0;
+        this.sessionStartTime = Date.now();
+        
         // Input handling
         this.keys = {};
         this.spacePressed = false;
-        this.pPressed = false; // For power-up cheat
-        this.ePressed = false; // For teleport cheat
         this.mouseX = 0;
         this.mouseY = 0;
         
@@ -116,11 +137,20 @@ class ClaireGame {
             this.setupMobileControls();
         }
         
+        // Setup hidden admin system
+        this.setupAdminSystem();
+        
+        // Setup admin commands
+        this.setupAdminCommands();
+        
+        // Check if starting in admin mode
+        this.checkAdminStartup();
+        
         // Start game loop
         this.gameLoop();
         
         console.log("🎮 Claire's Adventure started! Collect stars and avoid hazards!");
-        console.log("🛠️ DEV CONTROLS: Press 'P' for power-up, 'E' to teleport to end");
+
     }
     
     setupLighting() {
@@ -597,6 +627,516 @@ class ClaireGame {
         console.log(`Mobile boss button ${buttonId} (${type}) setup complete`);
     }
     
+    setupAdminSystem() {
+        // Listen for keydown events globally to detect "abc" sequence
+        document.addEventListener('keydown', (e) => {
+            // Only track if not in input fields
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                this.handleAdminSequence(e.key.toLowerCase());
+            }
+        });
+        
+        // Setup admin panel controls
+        const adminPanel = document.getElementById('adminPanel');
+        const adminPassword = document.getElementById('adminPassword');
+        const adminLogin = document.getElementById('adminLogin');
+        const adminCancel = document.getElementById('adminCancel');
+        
+        // Admin login button
+        adminLogin.addEventListener('click', () => {
+            this.checkAdminPassword();
+        });
+        
+        // Admin cancel button
+        adminCancel.addEventListener('click', () => {
+            this.hideAdminPanel();
+        });
+        
+        // Allow Enter key in password field
+        adminPassword.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                this.checkAdminPassword();
+            }
+        });
+        
+        console.log("🔒 Admin system initialized (hidden)");
+    }
+    
+    handleAdminSequence(key) {
+        // Add key to sequence
+        this.adminSequence.push(key);
+        
+        // Keep only last 3 keys
+        if (this.adminSequence.length > 3) {
+            this.adminSequence.shift();
+        }
+        
+        // Check if sequence matches "abc"
+        if (this.adminSequence.length === 3 && 
+            this.adminSequence[0] === 'a' && 
+            this.adminSequence[1] === 'b' && 
+            this.adminSequence[2] === 'c') {
+            
+            this.showAdminPanel();
+            this.adminSequence = []; // Reset sequence
+        }
+    }
+    
+    showAdminPanel() {
+        const adminPanel = document.getElementById('adminPanel');
+        const adminPassword = document.getElementById('adminPassword');
+        
+        adminPanel.style.display = 'block';
+        adminPassword.value = '';
+        adminPassword.focus();
+        
+        console.log("🔓 Admin panel opened");
+    }
+    
+    hideAdminPanel() {
+        const adminPanel = document.getElementById('adminPanel');
+        const adminPassword = document.getElementById('adminPassword');
+        
+        adminPanel.style.display = 'none';
+        adminPassword.value = '';
+        
+        console.log("🔒 Admin panel closed");
+    }
+    
+    checkAdminPassword() {
+        const adminPassword = document.getElementById('adminPassword');
+        const password = adminPassword.value;
+        
+        if (password === 'viewsonic') {
+            this.enableAdminMode();
+            this.hideAdminPanel();
+        } else {
+            // Wrong password - shake the panel
+            const adminPanel = document.getElementById('adminPanel');
+            adminPanel.style.animation = 'shake 0.5s ease-in-out';
+            setTimeout(() => {
+                adminPanel.style.animation = '';
+            }, 500);
+            
+            adminPassword.value = '';
+            adminPassword.focus();
+            
+            console.log("❌ Invalid admin password");
+        }
+    }
+    
+    enableAdminMode() {
+        this.adminMode = true;
+        
+        // Show admin status indicator
+        const adminStatus = document.getElementById('adminStatus');
+        adminStatus.style.display = 'block';
+        
+        // Make admin status clickable to disable admin mode
+        adminStatus.style.cursor = 'pointer';
+        adminStatus.onclick = () => {
+            this.disableAdminMode();
+        };
+        
+        // Save admin authentication token
+        this.saveAdminToken();
+        
+        console.log("👑 ADMIN MODE ENABLED - Dev controls active!");
+        console.log("🛠️ DEV CONTROLS: Press 'P' for power-up, 'E' to teleport to boss area");
+        console.log("🔄 Click the admin indicator to disable admin mode");
+        console.log("🎛️ Full admin panel available - type 'admin' to access");
+        
+        // Show temporary message
+        this.showMessage("👑 ADMIN MODE ACTIVATED<br>Dev controls enabled!<br><small>Type 'admin' for full panel</small>", 4000);
+    }
+    
+    saveAdminToken() {
+        // Create secure admin token
+        const timestamp = Date.now();
+        const secretKey = 'claire_adventure_secret_2024';
+        const combined = 'admin_authenticated' + secretKey + timestamp;
+        let hash = 0;
+        for (let i = 0; i < combined.length; i++) {
+            const char = combined.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        
+        const token = {
+            hash: Math.abs(hash).toString(16),
+            timestamp: timestamp,
+            expires: timestamp + (24 * 60 * 60 * 1000) // 24 hours
+        };
+        
+        localStorage.setItem('claire_admin_token', JSON.stringify(token));
+    }
+    
+    // Add admin command listener
+    setupAdminCommands() {
+        let adminSequence = [];
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                adminSequence.push(e.key.toLowerCase());
+                
+                // Keep only last 5 keys
+                if (adminSequence.length > 5) {
+                    adminSequence.shift();
+                }
+                
+                // Check for "admin" command
+                if (adminSequence.length >= 5 && 
+                    adminSequence.slice(-5).join('') === 'admin' && 
+                    this.adminMode) {
+                    this.openAdminPanel();
+                    adminSequence = [];
+                }
+            }
+        });
+    }
+    
+    openAdminPanel() {
+        if (this.adminMode) {
+            window.open('admin.html', '_blank');
+            console.log("🎛️ Admin panel opened");
+        }
+    }
+    
+    disableAdminMode() {
+        this.adminMode = false;
+        
+        // Hide admin status indicator  
+        const adminStatus = document.getElementById('adminStatus');
+        adminStatus.style.display = 'none';
+        
+        console.log("🔒 Admin mode disabled");
+    }
+    
+    checkAdminStartup() {
+        // Check URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('admin') === 'true') {
+            // Validate admin token
+            try {
+                const tokenData = localStorage.getItem('claire_admin_token');
+                if (tokenData) {
+                    const token = JSON.parse(tokenData);
+                    if (this.validateAdminToken(token)) {
+                        this.enableAdminMode();
+                        console.log("🎛️ Admin mode auto-enabled from panel");
+                    }
+                }
+            } catch (error) {
+                console.log("❌ Invalid admin token");
+            }
+        }
+    }
+    
+    validateAdminToken(token) {
+        if (!token || !token.hash || !token.timestamp || !token.expires) {
+            return false;
+        }
+        
+        // Check if token expired
+        if (Date.now() > token.expires) {
+            return false;
+        }
+        
+        // Validate hash
+        const secretKey = 'claire_adventure_secret_2024';
+        const combined = 'admin_authenticated' + secretKey + token.timestamp;
+        let hash = 0;
+        for (let i = 0; i < combined.length; i++) {
+            const char = combined.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        const expectedHash = Math.abs(hash).toString(16);
+        return token.hash === expectedHash;
+    }
+    
+    // Admin API methods for the admin panel
+    setGodMode(enabled) {
+        this.godMode = enabled;
+        console.log("👑 Admin API: God Mode", enabled ? "ON" : "OFF");
+    }
+    
+    setInfiniteLives(enabled) {
+        this.infiniteLives = enabled;
+        console.log("👑 Admin API: Infinite Lives", enabled ? "ON" : "OFF");
+    }
+    
+    setSpeedMultiplier(multiplier) {
+        this.speedMultiplier = multiplier;
+        console.log("👑 Admin API: Speed Multiplier", multiplier);
+    }
+    
+    setJumpHeight(multiplier) {
+        this.jumpMultiplier = multiplier;
+        console.log("👑 Admin API: Jump Height", multiplier);
+    }
+    
+    setStarCount(count) {
+        this.stars = Math.max(0, count);
+        document.getElementById('stars').textContent = `⭐ Stars: ${this.stars}`;
+        console.log("👑 Admin API: Star Count", count);
+    }
+    
+    teleportPlayer(x, y, z) {
+        if (this.player) {
+            this.player.position.set(x, y, z);
+            this.player.velocity.set(0, 0, 0);
+            console.log(`👑 Admin API: Teleported to (${x}, ${y}, ${z})`);
+        }
+    }
+    
+    setBossHealth(percentage) {
+        if (this.boss && this.gameState === 'boss') {
+            this.bossHealth = (this.bossMaxHealth * percentage) / 100;
+            const healthBar = document.getElementById('bossHealth');
+            if (healthBar) {
+                healthBar.style.width = percentage + '%';
+            }
+            console.log("👑 Admin API: Boss Health", percentage + "%");
+        }
+    }
+    
+    setPlayerHealth(percentage) {
+        if (this.gameState === 'boss') {
+            this.playerHealth = (this.playerMaxHealth * percentage) / 100;
+            this.updatePlayerHealthBar();
+            console.log("👑 Admin API: Player Health", percentage + "%");
+        }
+    }
+    
+    setWireframeMode(enabled) {
+        // Apply wireframe to all materials
+        this.scene.traverse((object) => {
+            if (object.material) {
+                if (Array.isArray(object.material)) {
+                    object.material.forEach(mat => mat.wireframe = enabled);
+                } else {
+                    object.material.wireframe = enabled;
+                }
+            }
+        });
+        console.log("👑 Admin API: Wireframe Mode", enabled ? "ON" : "OFF");
+    }
+    
+    setPlayerScale(scale) {
+        if (this.player) {
+            this.player.scale.set(scale, scale, scale);
+            console.log("👑 Admin API: Player Scale", scale);
+        }
+    }
+    
+    // Additional Admin API methods
+    resetLevel() {
+        this.lives = 3;
+        this.stars = 0;
+        this.gameState = 'playing';
+        this.deactivatePowerUp();
+        this.respawnPlayer();
+        this.updateUI();
+        console.log("👑 Admin API: Level Reset");
+    }
+    
+    setPhysicsEnabled(enabled) {
+        this.physicsEnabled = enabled;
+        if (!enabled) {
+            this.playerVelocity.set(0, 0, 0);
+        }
+        console.log("👑 Admin API: Physics", enabled ? "ON" : "OFF");
+    }
+    
+    setPaused(paused) {
+        this.gamePaused = paused;
+        console.log("👑 Admin API: Game", paused ? "PAUSED" : "RESUMED");
+    }
+    
+    unlockAllAreas() {
+        // Remove any barriers or unlock all platforms
+        console.log("👑 Admin API: All areas unlocked");
+    }
+    
+    skipBossPrep() {
+        if (this.gameState === 'bossPrep') {
+            this.startActualBossFight();
+            console.log("👑 Admin API: Boss prep skipped");
+        }
+    }
+    
+    resetBossFight() {
+        if (this.gameState === 'boss' || this.gameState === 'bossPrep') {
+            this.cleanupArena();
+            this.teleportBackToGame();
+            this.gameState = 'playing';
+            console.log("👑 Admin API: Boss fight reset");
+        }
+    }
+    
+    triggerBossAbility(type) {
+        if (this.gameState === 'boss' && this.boss) {
+            switch(type) {
+                case 'laser':
+                    this.bossLaserBeam();
+                    break;
+                case 'missile':
+                    this.bossMissileLaunch();
+                    break;
+                case 'heal':
+                    this.bossHeal();
+                    break;
+            }
+            console.log(`👑 Admin API: Boss ${type} triggered`);
+        }
+    }
+    
+    setParticlesEnabled(enabled) {
+        this.particlesEnabled = enabled;
+        if (!enabled) {
+            // Remove existing particles
+            this.battleEffects.forEach(effect => {
+                this.scene.remove(effect.object);
+            });
+            this.battleEffects = [];
+        }
+        console.log("👑 Admin API: Particles", enabled ? "ON" : "OFF");
+    }
+    
+    setLightingBrightness(brightness) {
+        this.scene.traverse((object) => {
+            if (object.isLight) {
+                object.intensity = brightness;
+            }
+        });
+        console.log("👑 Admin API: Lighting Brightness", brightness);
+    }
+    
+    setGridEnabled(enabled) {
+        if (enabled) {
+            this.createGrid();
+        } else {
+            this.removeGrid();
+        }
+        console.log("👑 Admin API: Grid", enabled ? "ON" : "OFF");
+    }
+    
+    createGrid() {
+        if (this.gridHelper) {
+            this.scene.remove(this.gridHelper);
+        }
+        
+        const size = 100;
+        const divisions = 50;
+        this.gridHelper = new THREE.GridHelper(size, divisions);
+        this.gridHelper.position.y = -1;
+        this.scene.add(this.gridHelper);
+    }
+    
+    removeGrid() {
+        if (this.gridHelper) {
+            this.scene.remove(this.gridHelper);
+            this.gridHelper = null;
+        }
+    }
+    
+    setRainbowTrail(enabled) {
+        this.rainbowTrail = enabled;
+        if (enabled) {
+            this.initRainbowTrail();
+        } else {
+            this.clearRainbowTrail();
+        }
+        console.log("👑 Admin API: Rainbow Trail", enabled ? "ON" : "OFF");
+    }
+    
+    initRainbowTrail() {
+        this.rainbowParticles = [];
+        this.rainbowColors = [0xff0000, 0xff8800, 0xffff00, 0x00ff00, 0x0088ff, 0x8800ff];
+    }
+    
+    clearRainbowTrail() {
+        if (this.rainbowParticles) {
+            this.rainbowParticles.forEach(particle => {
+                this.scene.remove(particle);
+            });
+            this.rainbowParticles = [];
+        }
+    }
+    
+    setDiscoLights(enabled) {
+        this.discoLights = enabled;
+        if (enabled) {
+            this.startDiscoLights();
+        } else {
+            this.stopDiscoLights();
+        }
+        console.log("👑 Admin API: Disco Lights", enabled ? "ON" : "OFF");
+    }
+    
+    startDiscoLights() {
+        this.discoInterval = setInterval(() => {
+            const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            
+            this.scene.traverse((object) => {
+                if (object.isLight && object !== this.directionalLight) {
+                    object.color.setHex(randomColor);
+                }
+            });
+        }, 200);
+    }
+    
+    stopDiscoLights() {
+        if (this.discoInterval) {
+            clearInterval(this.discoInterval);
+            this.discoInterval = null;
+            
+            // Reset lights to normal
+            this.scene.traverse((object) => {
+                if (object.isLight && object !== this.directionalLight) {
+                    object.color.setHex(0xffffff);
+                }
+            });
+        }
+    }
+    
+    setSuperSpeed(enabled) {
+        this.superSpeed = enabled;
+        if (enabled) {
+            this.originalTimeScale = 1.0;
+            this.timeScale = 0.3; // Slow motion effect
+        } else {
+            this.timeScale = this.originalTimeScale || 1.0;
+        }
+        console.log("👑 Admin API: Super Speed", enabled ? "ON" : "OFF");
+    }
+    
+    setPathTracking(enabled) {
+        this.pathTracking = enabled;
+        if (enabled) {
+            this.playerPath = [];
+            this.pathLine = null;
+        } else {
+            this.clearPlayerPath();
+        }
+        console.log("👑 Admin API: Path Tracking", enabled ? "ON" : "OFF");
+    }
+    
+    clearPlayerPath() {
+        if (this.pathLine) {
+            this.scene.remove(this.pathLine);
+            this.pathLine = null;
+        }
+        this.playerPath = [];
+    }
+    
+    clearAnalytics() {
+        this.deathCount = 0;
+        this.sessionStartTime = Date.now();
+        console.log("👑 Admin API: Analytics cleared");
+    }
+    
     // Debug function to check boss fight state
     debugBossFight() {
         console.log('=== BOSS FIGHT DEBUG ===');
@@ -632,8 +1172,8 @@ class ClaireGame {
     updatePlayer(deltaTime) {
         if (!this.player || this.gameState !== 'playing') return;
         
-        const speed = 5;
-        const jumpForce = 10;
+        const speed = 5 * this.speedMultiplier;
+        const jumpForce = 10 * this.jumpMultiplier;
         const gravity = -20;
         
         // Handle input (keyboard + mobile)
@@ -675,27 +1215,33 @@ class ClaireGame {
             }
         }
         
-        // Track jump state to prevent holding
+                // Track jump state to prevent holding
         this.spacePressed = jumpPressed;
         
-        // Development cheat keys
-        if (this.keys['KeyP'] && !this.pPressed) {
-            // Activate Claire is Awesome mode
-            this.activatePowerUp();
-            console.log("🌟 DEV: Claire is Awesome mode activated for 60 seconds!");
+        // Admin-only development controls
+        if (this.adminMode) {
+            if (this.keys['KeyP'] && !this.pPressed) {
+                // Activate Claire is Awesome mode
+                this.activatePowerUp();
+                console.log("👑 ADMIN: Claire is Awesome mode activated!");
+            }
+            this.pPressed = this.keys['KeyP'];
+            
+            if (this.keys['KeyE'] && !this.ePressed) {
+                // Teleport to boss area
+                this.player.position.set(36, 10, 0); // Slightly past trigger point
+                this.player.velocity.set(0, 0, 0);
+                console.log("👑 ADMIN: Teleported to boss area!");
+            }
+            this.ePressed = this.keys['KeyE'];
+        } else {
+            // Reset pressed states when not in admin mode
+            this.pPressed = this.keys['KeyP'];
+            this.ePressed = this.keys['KeyE'];
         }
-        this.pPressed = this.keys['KeyP'];
         
-        if (this.keys['KeyE'] && !this.ePressed) {
-            // Teleport to end/boss area
-            this.player.position.set(36, 10, 0); // Slightly past trigger point
-            this.player.velocity.set(0, 0, 0);
-            console.log("🚀 DEV: Teleported to boss area at x=36!");
-        }
-        this.ePressed = this.keys['KeyE'];
-        
-        // Apply gravity (unless flying)
-        if (!this.isFlying) {
+        // Apply gravity (unless flying or physics disabled)
+        if (!this.isFlying && this.physicsEnabled) {
             this.playerVelocity.y += gravity * deltaTime;
         } else {
             // Flying controls - up, down, and hover (keyboard + mobile)
@@ -730,8 +1276,10 @@ class ClaireGame {
         this.updateCamera();
         
         // Check if player fell off the world
-        if (this.player.position.y < -10) {
-            this.respawnPlayer();
+        if (this.player.position.y < -2) {
+            console.log(`💀 Player fell off the world! Position: x=${this.player.position.x.toFixed(2)}, y=${this.player.position.y.toFixed(2)}, z=${this.player.position.z.toFixed(2)}`);
+            console.log(`💀 Lives before: ${this.lives}, God Mode: ${this.godMode}, Infinite Lives: ${this.infiniteLives}`);
+            this.takeDamage();
         }
         
         // Check if player reached boss area
@@ -744,7 +1292,9 @@ class ClaireGame {
     }
     
     checkGroundCollision() {
-        if (this.player.position.y <= 0.5) {
+        // Only apply ground collision near the starting area (X < 2)
+        // This allows players to fall off platforms and trigger falling detection
+        if (this.player.position.y <= 0.5 && this.player.position.x < 2) {
             this.player.position.y = 0.5;
             this.playerVelocity.y = 0;
             this.isGrounded = true;
@@ -905,10 +1455,22 @@ class ClaireGame {
     }
     
     takeDamage() {
-        this.lives--;
+        // God mode protection
+        if (this.godMode) {
+            console.log("👑 God Mode: Damage ignored!");
+            return;
+        }
+        
+        this.deathCount++; // Track deaths for analytics
+        
+        // Infinite lives protection
+        if (!this.infiniteLives) {
+            this.lives--;
+        }
+        
         this.updateUI();
         
-        if (this.lives <= 0) {
+        if (this.lives <= 0 && !this.infiniteLives) {
             this.gameOver();
         } else {
             this.respawnPlayer();
@@ -2308,16 +2870,105 @@ class ClaireGame {
     }
     
     gameLoop() {
-        const deltaTime = this.clock.getDelta();
+        let deltaTime = this.clock.getDelta();
         
-        this.updatePlayer(deltaTime);
-        this.updateTurtles(deltaTime);
-        this.animateCollectibles(deltaTime);
-        this.updatePowerUp(deltaTime);
-        this.updateBoss(deltaTime);
+        // Apply time scale for super speed effect
+        deltaTime *= this.timeScale;
+        
+        // Skip updates if game is paused (but still render)
+        if (!this.gamePaused) {
+            this.updatePlayer(deltaTime);
+            this.updateTurtles(deltaTime);
+            this.animateCollectibles(deltaTime);
+            this.updatePowerUp(deltaTime);
+            this.updateBoss(deltaTime);
+            
+            // Update admin features
+            this.updateAdminFeatures(deltaTime);
+        }
         
         this.renderer.render(this.scene, this.camera);
         requestAnimationFrame(() => this.gameLoop());
+    }
+    
+    updateAdminFeatures(deltaTime) {
+        // Rainbow trail
+        if (this.rainbowTrail && this.player) {
+            this.updateRainbowTrail();
+        }
+        
+        // Path tracking
+        if (this.pathTracking && this.player) {
+            this.updatePathTracking();
+        }
+    }
+    
+    updateRainbowTrail() {
+        if (!this.rainbowParticles || !this.rainbowColors) return;
+        
+        // Add new particle at player position every few frames
+        if (!this.lastRainbowTime || Date.now() - this.lastRainbowTime > 100) {
+            const particleGeometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const colorIndex = this.rainbowParticles.length % this.rainbowColors.length;
+            const particleMaterial = new THREE.MeshBasicMaterial({
+                color: this.rainbowColors[colorIndex],
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+            particle.position.copy(this.player.position);
+            particle.userData = { createdAt: Date.now() };
+            
+            this.scene.add(particle);
+            this.rainbowParticles.push(particle);
+            this.lastRainbowTime = Date.now();
+        }
+        
+        // Remove old particles
+        const maxAge = 2000; // 2 seconds
+        const currentTime = Date.now();
+        
+        this.rainbowParticles = this.rainbowParticles.filter(particle => {
+            const age = currentTime - particle.userData.createdAt;
+            if (age > maxAge) {
+                this.scene.remove(particle);
+                return false;
+            }
+            
+            // Fade out over time
+            const fadeProgress = age / maxAge;
+            particle.material.opacity = 0.8 * (1 - fadeProgress);
+            
+            return true;
+        });
+    }
+    
+    updatePathTracking() {
+        if (!this.playerPath) return;
+        
+        // Add current position to path (every few frames to avoid too many points)
+        if (!this.lastPathTime || Date.now() - this.lastPathTime > 200) {
+            this.playerPath.push(this.player.position.clone());
+            this.lastPathTime = Date.now();
+        }
+        
+        // Limit path length
+        if (this.playerPath.length > 500) {
+            this.playerPath.shift();
+        }
+        
+        // Update line visualization
+        if (this.playerPath.length > 1) {
+            if (this.pathLine) {
+                this.scene.remove(this.pathLine);
+            }
+            
+            const geometry = new THREE.BufferGeometry().setFromPoints(this.playerPath);
+            const material = new THREE.LineBasicMaterial({ color: 0x00ff00, opacity: 0.7, transparent: true });
+            this.pathLine = new THREE.Line(geometry, material);
+            this.scene.add(this.pathLine);
+        }
     }
 }
 
@@ -2327,6 +2978,11 @@ let game;
 window.addEventListener('load', () => {
     game = new ClaireGame();
     window.game = game; // Make game globally accessible
+    
+    // Make game instance available to admin system
+    if (window.adminSystem) {
+        window.adminSystem.gameInstance = game;
+    }
     
     // Add debug function to window for console access
     window.debugBoss = () => {
