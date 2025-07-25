@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claire's Adventure - 3D Platformer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #87CEEB, #98FB98);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            color: white;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        #ui div {
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+        
+        #powerupStatus {
+            background: rgba(255, 215, 0, 0.8);
+            padding: 10px;
+            border-radius: 8px;
+            color: #333;
+            display: none;
+        }
+        
+        #instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            font-size: 14px;
+        }
+        
+        #bossHealthBar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 200px;
+            height: 20px;
+            background: rgba(255, 0, 0, 0.3);
+            border: 2px solid white;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        #bossHealth {
+            height: 100%;
+            background: linear-gradient(90deg, #ff4444, #ff0000);
+            border-radius: 8px;
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        #playerHealthBar {
+            position: absolute;
+            top: 50px;
+            right: 20px;
+            width: 200px;
+            height: 20px;
+            background: rgba(0, 255, 0, 0.3);
+            border: 2px solid white;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        #playerHealth {
+            height: 100%;
+            background: linear-gradient(90deg, #44ff44, #00ff00);
+            border-radius: 8px;
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        #bossControls {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            gap: 15px;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #bossControls button {
+            padding: 12px 20px;
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            color: white;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        
+        #bossControls button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+            background: linear-gradient(145deg, #7c8aea, #8b5ba2);
+        }
+        
+        #bossControls button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        /* Mobile Controls */
+        #mobileControls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            display: none;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        
+        .mobile-control {
+            position: absolute;
+            pointer-events: all;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        
+        #virtualJoystick {
+            bottom: 20px;
+            left: 20px;
+            width: 120px;
+            height: 120px;
+            background: rgba(255, 255, 255, 0.3);
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #joystickKnob {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 50%;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            transition: none;
+        }
+        
+        #jumpButton {
+            bottom: 60px;
+            right: 20px;
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(145deg, #4CAF50, #45a049);
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        #jumpButton:active {
+            background: linear-gradient(145deg, #45a049, #4CAF50);
+            transform: scale(0.95);
+        }
+        
+        #flyControls {
+            bottom: 150px;
+            right: 20px;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .fly-button {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(145deg, #2196F3, #1976D2);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+        }
+        
+        .fly-button:active {
+            background: linear-gradient(145deg, #1976D2, #2196F3);
+            transform: scale(0.95);
+        }
+        
+        #mobileBossControls {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            flex-direction: row;
+            gap: 15px;
+        }
+        
+        .mobile-boss-button {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(145deg, #667eea, #764ba2);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 15px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            flex-direction: column;
+            padding: 5px;
+        }
+        
+        .mobile-boss-button:active {
+            background: linear-gradient(145deg, #764ba2, #667eea);
+            transform: scale(0.95);
+        }
+        
+        .mobile-boss-button:disabled,
+        .mobile-boss-button.disabled {
+            opacity: 0.4;
+            transform: none;
+            pointer-events: none;
+            filter: grayscale(50%);
+            background: linear-gradient(145deg, #999, #666) !important;
+        }
+        
+        .mobile-boss-button:not(:disabled):not(.disabled):active {
+            transform: scale(0.9);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+        
+        .mobile-boss-button .button-text {
+            font-size: 10px;
+            margin-top: 2px;
+        }
+        
+        /* Show/hide instructions based on device */
+        .mobile-only {
+            display: none;
+        }
+        
+        .desktop-only {
+            display: inline;
+        }
+        
+        /* Mobile responsive adjustments */
+        @media (max-width: 768px) {
+            #ui {
+                font-size: 16px;
+            }
+            
+            #instructions {
+                font-size: 12px;
+                bottom: 220px;
+            }
+            
+            #bossControls {
+                display: none !important;
+            }
+            
+            #playerHealthBar, #bossHealthBar {
+                width: 150px;
+                height: 15px;
+            }
+            
+            .game-message {
+                font-size: 18px;
+                padding: 20px;
+            }
+            
+            .mobile-only {
+                display: inline;
+            }
+            
+            .desktop-only {
+                display: none;
+            }
+        }
+        
+        .game-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            text-align: center;
+            display: none;
+            z-index: 200;
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="ui">
+            <div id="stars">⭐ Stars: 0</div>
+            <div id="lives">❤️ Lives: 3</div>
+            <div id="powerupStatus">
+                🌟 CLAIRE IS AWESOME! 🌟<br>
+                Invincible & Flying: <span id="powerupTimer">60</span>s<br>
+                <small>SPACE = Fly Up | SHIFT = Fly Down</small>
+            </div>
+        </div>
+        
+        <div id="instructions">
+            <span class="desktop-only">WASD: Move | SPACE: Jump (double jump!) | Mouse: Look around</span>
+            <span class="mobile-only">📱 Use joystick to move | Tap jump button for double jump!</span><br>
+            Collect ⭐ stars! Avoid 🔺 spikes and 🐢 turtles!<br>
+            Find the "Claire is Awesome" power-up! 🌟<br>
+            <span style="color: #90EE90;" class="desktop-only">Power-up Mode: SPACE = Fly Up | SHIFT = Fly Down</span>
+            <span style="color: #90EE90;" class="mobile-only">Power-up Mode: Use ⬆️⬇️ fly buttons</span><br>
+            <span style="color: #ff69b4;">Boss Fight: 🗡️ Dagger | 💚 Heal | 💥 Sonic Blast</span><br>
+            <span style="color: #ffdd44;" class="desktop-only">DEV: P = Power-up | E = Teleport to end</span>
+        </div>
+        
+        <div id="playerHealthBar">
+            <label>Claire's Health:</label>
+            <div id="playerHealth"></div>
+        </div>
+        
+        <div id="bossHealthBar">
+            <label>Boss Health:</label>
+            <div id="bossHealth"></div>
+        </div>
+        
+        <div id="bossControls">
+            <button id="daggerBtn" onclick="game.daggerLaunch()">🗡️ Dagger Launch</button>
+            <button id="healBtn" onclick="game.healPlayer()">💚 Heal</button>
+            <button id="sonicBtn" onclick="game.sonicBlast()">💥 Sonic Blast</button>
+        </div>
+        
+        <div id="gameMessage" class="game-message">
+            <div id="messageText"></div>
+            <button id="restartBtn" onclick="restartGame()">Try Again</button>
+        </div>
+        
+        <!-- Mobile Controls -->
+        <div id="mobileControls">
+            <!-- Virtual Joystick -->
+            <div id="virtualJoystick" class="mobile-control">
+                <div id="joystickKnob"></div>
+            </div>
+            
+            <!-- Jump Button -->
+            <div id="jumpButton" class="mobile-control">
+                ⬆️
+            </div>
+            
+            <!-- Flying Controls (shown during power-up) -->
+            <div id="flyControls" class="mobile-control">
+                <div id="flyUpBtn" class="fly-button">⬆️</div>
+                <div id="flyDownBtn" class="fly-button">⬇️</div>
+            </div>
+            
+            <!-- Boss Fight Controls (shown during boss fight) -->
+            <div id="mobileBossControls" class="mobile-control">
+                <div id="mobileDaggerBtn" class="mobile-boss-button">
+                    🗡️
+                    <span class="button-text">DAGGER</span>
+                </div>
+                <div id="mobileHealBtn" class="mobile-boss-button">
+                    💚
+                    <span class="button-text">HEAL</span>
+                </div>
+                <div id="mobileSonicBtn" class="mobile-boss-button">
+                    💥
+                    <span class="button-text">SONIC</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script>
+        // Ensure THREE is available before loading game
+        if (typeof THREE !== 'undefined') {
+            console.log('THREE.js loaded successfully!');
+            const script = document.createElement('script');
+            script.src = 'game.js';
+            document.head.appendChild(script);
+        } else {
+            console.error('THREE.js failed to load');
+            document.getElementById('messageText').innerHTML = 'Failed to load 3D engine. Please refresh the page.';
+            document.getElementById('gameMessage').style.display = 'block';
+        }
+    </script>
+</body>
+</html> 
